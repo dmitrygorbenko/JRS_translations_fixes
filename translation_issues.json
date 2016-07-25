@@ -15,7 +15,7 @@
 	"href='email": "href=''email",
 
 	"#" : "translating    class=''abc''    into    class='abc'   ",
-	"\\1='\\2'": "/ ([^=]*)=''([^'])''/",
+	"\\1='\\2'": "/ ([^=]*)=''([^']*)''/",
 
 	"#" : "translating    ''mondrian.rolap.maxSqlQueryThreads'    into    'mondrian.rolap.maxSqlQueryThreads'   ",
 	" '\\1": "/ ''(\\p{L}{1})/",

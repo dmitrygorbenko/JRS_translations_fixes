@@ -18,12 +18,17 @@ unset($commonIssues->$commentsKey);
 
 
 $args = $_SERVER["argv"];
-
 if (count($args) < 2) {
     // not enough arguments
     help();
     exit;
 }
+
+// parsing command line options
+$cmdOptions = getopt("vd", ["verbose", "dry-run"]);
+
+define("VERBOSE_MODE", isset($cmdOptions["v"]) || isset($cmdOptions["verbose"]));
+define("DRY_RUN_MODE", isset($cmdOptions["d"]) || isset($cmdOptions["dry-run"]));
 
 $translationFolder  = $args[count($args) - 1];
 if (!is_dir($translationFolder)) {

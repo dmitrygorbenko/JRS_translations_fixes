@@ -1,7 +1,9 @@
 <?php
 
 function debug($message) {
-    //echo $message."\n";
+	if (VERBOSE_MODE) {
+		echo $message . "\n";
+	}
 }
 
 function pa($var, $exit = false) {
@@ -185,7 +187,7 @@ function doCorrectionsInFile($translationsFileNames) {
         $translations[$translationsFileName] = explode("\n", $translationContent);
     }
 
-    foreach ($translations as $translationFileName => $translationLines) {
+    foreach ($translations as $translationFileName => &$translationLines) {
 
 		$correctionsPerFile = (object)[
 			"fileName" => $translationFileName,
@@ -193,7 +195,7 @@ function doCorrectionsInFile($translationsFileNames) {
 			"lineCorrections" => []
 		];
 
-        foreach ($translationLines as $translationLine) {
+        foreach ($translationLines as &$translationLine) {
 
 			$correctionsPerLine = (object)[
 				"issues" => [],
@@ -285,7 +287,12 @@ function doCorrectionsInFile($translationsFileNames) {
 			}
         }
 
-        // if we do have any corrections, let's count them
+		if (!DRY_RUN_MODE && false) {
+			$content = implode("\n", $translationLines);
+			file_put_contents($translationFileName, $content);
+		}
+
+		// if we do have any corrections, let's count them
         if ($correctionsPerFile->correctionsCount > 0) {
 			$corrections[] = $correctionsPerFile;
 		}

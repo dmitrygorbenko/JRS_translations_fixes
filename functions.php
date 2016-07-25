@@ -26,9 +26,9 @@ function pa($var, $exit = false) {
 function help() {
 
     $description = "Script seeks for issues in translations for JRS made by internationalization team and fixes them.
-Usually it comes to fixes like this one:
-    from: ''{0}''
-    to:    '{0}'
+Usually it comes to fix issues like this one:
+    issue:   ''{0}''
+    correct:  '{0}'
 So it finds all '*.properties' files and tries to find issues in them.
 Issues are described in file named 'translation_issues.json'. Format of this file is JSON and 
 a 'key' means correct version while the 'value' of the 'key' describes errors made by translators.
@@ -50,7 +50,7 @@ Script prints statistic into file 'corrections_found.txt'.";
 \ttranslations folder:   The folder which has '*.properties' files with translations\n
 Options are:
 \t-v, --verbose     Verbose mode
-\t-d, --dry-run     Don't do any changes, just print the statistic to file 'corrections_found.txt'\n
+\t-r, --replace     Do replaces in translation files\n
 Example: ".$_SERVER["argv"][0]." -v ./tests\n
 Description:
 ".$description."\n";
@@ -175,11 +175,46 @@ function getTranslationFilesInFolder($folder) {
 }
 
 
-function doCorrectionsInFile($translationsFileNames) {
+// searching '$translationLine' in '$originalContent'
+// pass '$originalContent' by reference to make script runs faster
+function getOriginalLine ($translationFileName, &$originalContent, $translationLine) {
+	// break translation line by key and value
+	// we don't use 'explode' because there can be many '=' characters
+
+	$equalCharPosition = strpos($translationLine, "=");
+	if ($equalCharPosition === false) {
+		// what ?!
+		echo "Translation '".$translationFileName."' has issue on line:\n\t'".$translationLine."'\n: it doesn't have character '='\n";
+		exit;
+	}
+	$key = substr($translationLine, 0, $equalCharPosition);
+
+	$keyPositionInOriginal = strpos($originalContent, $key);
+
+	$value = "";
+	$pos = $keyPositionInOriginal + strlen($key) + 1;
+	// win endings: 0D 0A
+	// unix ending: 0A
+	// so it's safe to collect all chars up to 0A (\n)
+	while ($originalContent[$pos] !== "\n") {
+		$value = $value . $originalContent[$pos];
+		$pos++;
+	}
+
+	$originLine = $key."=".$value;
+	
+	return $originLine;
+}
+
+
+function doCorrectionsInFile($originFile, $translationsFileNames) {
 
     global $commonIssues;
 
+	// variable which we are going to return with some statistic
 	$corrections = [];
+
+	$originalContent = file_get_contents($originFile);
 
     $translations = [];
     foreach ($translationsFileNames as $translationsFileName) {
@@ -199,9 +234,11 @@ function doCorrectionsInFile($translationsFileNames) {
 
 			$correctionsPerLine = (object)[
 				"issues" => [],
-				"originalLine" => $translationLine
+				"beforeCorrection" => $translationLine
 			];
 
+			// original line, we are blanking this variable to indicate that original line hasn't beed loaded
+			$originLine = "";
 
 			// loop for all issues we know
             foreach ($commonIssues as $correctVersion => $wrongVersions) {
@@ -213,34 +250,66 @@ function doCorrectionsInFile($translationsFileNames) {
                 // iterate over each known version of this issue
                 foreach ($wrongVersions as $wrongVersion) {
 
-                    $regexp = false;
-                    if ($wrongVersion[0] === "/" && $wrongVersion[strlen($wrongVersion) - 1] === "/") {
+					$originalHasIssue = false;
+					$translationHasIssue = false;
+
+					$regexp = false;
+					
+					$translationMatches = [];
+					// check translation against the issue: does it have it or not
+					if ($wrongVersion[0] === "/" && $wrongVersion[strlen($wrongVersion) - 1] === "/") {
                         $regexp = true;
-                    }
-
-                    $matches = [];
-                    if ($regexp === true) {
-                        $rc = preg_match_all($wrongVersion, $translationLine, $matches);
-
+                        $rc = preg_match_all($wrongVersion, $translationLine, $translationMatches);
                         if ($rc === 0) {
                             $rc = false;
                         }
-
                     } else {
                         $rc = strpos($translationLine, $wrongVersion);
                     }
+                    // 'rc' is the 'return code' after functions.
+					// convert it to boolean variable (yes, in old-fashion way for dummies)
+					if ($rc !== false) {
+						$translationHasIssue = true;
+					}
 
-                    // now, check if we found issue
-                    if ($rc !== false) {
+
+					// if translation has issue then we'll check original line against the same issue
+					if ($translationHasIssue === true) {
+
+						if ($originLine === "") {
+							$originLine = getOriginalLine($translationFileName, $originalContent, $translationLine);
+						}
+
+						// checking original line if it has issue
+						if ($regexp === true) {
+							$_ignore = [];
+							$rc = preg_match_all($wrongVersion, $originLine, $_ignore);
+							if ($rc === 0) {
+								$rc = false;
+							}
+						} else {
+							$rc = strpos($originLine, $wrongVersion);
+						}
+
+						// 'rc' is the 'return code' after functions.
+						// convert it to boolean variable (yes, in old-fashion way for dummies)
+						if ($rc !== false) {
+							$originalHasIssue = true;
+						}
+					}
+
+                    // now, if original doesn't have issue and translation has it
+					// it means translation team really did mistake. Correct it !
+                    if ($originalHasIssue === false && $translationHasIssue === true) {
+
+						debug("Found issue for: " . $correctVersion);
+						debug("Translation file name is: " . $translationFileName);
+						debug("Origin Line is: " . $originLine);
+						debug("Line is: " . $translationLine);
 
                         if ($regexp === true) {
-
-                            debug("Found issue for: " . $correctVersion);
-                            debug("Pattern for issue is: " . $wrongVersion);
-                            debug("Translation file name is: " . $translationFileName);
-                            debug("Line is: " . $translationLine);
-
-                            for ($i = 0; $i < count($matches[0]); $i++) {
+							debug("Pattern for issue is: " . $wrongVersion);
+                            for ($i = 0; $i < count($translationMatches[0]); $i++) {
 
                                 $replaceTo = $correctVersion;
 
@@ -252,23 +321,16 @@ function doCorrectionsInFile($translationsFileNames) {
                                         break;
                                     }
 
-                                    $replaceTo = str_replace($patternForNumber, $matches[$k + 1][$i], $replaceTo);
+                                    $replaceTo = str_replace($patternForNumber, $translationMatches[$k + 1][$i], $replaceTo);
                                 }
 
-                                $translationLine = str_replace($matches[0][$i], $replaceTo, $translationLine);
+                                $translationLine = str_replace($translationMatches[0][$i], $replaceTo, $translationLine);
                             }
-
-                            debug("Corrected line is: ".$translationLine);
-
                         } else {
-                            debug("Found issue for " . $correctVersion);
-                            debug("Translation file name is: " . $translationFileName);
-                            debug("Line is: " . $translationLine);
-
                             $translationLine = str_replace($wrongVersion, $correctVersion, $translationLine);
-
-                            debug("Corrected line is: ".$translationLine);
                         }
+
+						debug("Corrected line is: ".$translationLine);
 
                         // empty line
                         debug("");
@@ -278,8 +340,11 @@ function doCorrectionsInFile($translationsFileNames) {
                 }
             }
 
-			$correctionsPerLine->fixedLine = $translationLine;
+			$correctionsPerLine->afterCorrection = $translationLine;
+			$correctionsPerLine->originLine = $originLine;
+			$originLine = "";
 
+			// record '$correctionsPerLine' object only if it has corrections
 			$correctionsMade = count($correctionsPerLine->issues);
 			if ($correctionsMade > 0) {
 				$correctionsPerFile->lineCorrections[] = $correctionsPerLine;
@@ -287,7 +352,7 @@ function doCorrectionsInFile($translationsFileNames) {
 			}
         }
 
-		if (!DRY_RUN_MODE && false) {
+		if (REPLACE_MODE) {
 			$content = implode("\n", $translationLines);
 			file_put_contents($translationFileName, $content);
 		}

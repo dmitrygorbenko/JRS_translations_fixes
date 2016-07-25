@@ -25,10 +25,10 @@ if (count($args) < 2) {
 }
 
 // parsing command line options
-$cmdOptions = getopt("vd", ["verbose", "dry-run"]);
+$cmdOptions = getopt("vr", ["verbose", "replace"]);
 
 define("VERBOSE_MODE", isset($cmdOptions["v"]) || isset($cmdOptions["verbose"]));
-define("DRY_RUN_MODE", isset($cmdOptions["d"]) || isset($cmdOptions["dry-run"]));
+define("REPLACE_MODE", isset($cmdOptions["r"]) || isset($cmdOptions["replace"]));
 
 $translationFolder  = $args[count($args) - 1];
 if (!is_dir($translationFolder)) {
@@ -50,7 +50,7 @@ foreach ($translationGroups as $originFile => $translations) {
         $translation = $translationFolder."/".$translation;
     }
 
-	$correctionsPerFile = doCorrectionsInFile($translations);
+	$correctionsPerFile = doCorrectionsInFile($originFile, $translations);
 	if (count($correctionsPerFile) > 0) {
 		$statistic->corrections = array_merge($statistic->corrections, $correctionsPerFile);
 	}
@@ -87,8 +87,9 @@ foreach ($statistic->corrections as $correctionsPerFile) {
 	foreach ($correctionsPerFile->lineCorrections as $correctionsPerLine) {
 		$lineRecord = [];
 
-		$lineRecord[] = "Origin line: ".$correctionsPerLine->originalLine;
-		$lineRecord[] = "Fixed line:  ".$correctionsPerLine->fixedLine;
+		$lineRecord[] = "Origin line:       ".$correctionsPerLine->originLine;
+		$lineRecord[] = "Before correction: ".$correctionsPerLine->beforeCorrection;
+		$lineRecord[] = "After correction:  ".$correctionsPerLine->afterCorrection;
 		$lineRecord[] = "Issues found:  ".implode(", ", $correctionsPerLine->issues);
 		$lineRecord = implode("\n\t", $lineRecord);
 

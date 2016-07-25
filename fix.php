@@ -63,14 +63,14 @@ foreach ($statistic->corrections as $correctionsPerFile) {
 
 // print some statistic
 if ($statistic->correctionsMade) {
-	echo "Corrections made: " . $statistic->correctionsMade . "\n";
+	echo "Corrections found: " . $statistic->correctionsMade . "\n";
 	foreach ($statistic->corrections as $correctionsPerFile) {
 		if ($correctionsPerFile->correctionsCount > 0) {
 			echo $correctionsPerFile->fileName.": ".$correctionsPerFile->correctionsCount." fix(es)\n";
 		}
 	}
 } else {
-	echo "Everything is clear, no corrections\n";
+	echo "Everything is clear, no corrections found\n";
 	exit;
 }
 

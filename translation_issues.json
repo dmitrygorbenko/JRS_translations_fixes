@@ -1,0 +1,24 @@
+{
+
+	"#" : "translating     '''{'''newline}    into    {newline}",
+	"{": ["'''{'''", "''{''"],
+
+	"#" : "translating     ''{0}''    into    '{0}'  ",
+	"'{\\1}'": "/''\\{(\\d)\\}''/",
+
+	"#" : "translating     class=''''launcher inline''''    into    class='launcher inline'  ",
+	"'": "''''",
+
+	"#" : "translating     href=''http    into    href='http",
+	"href='http": "href=''http",
+	"href='ftp": "href=''ftp",
+	"href='email": "href=''email",
+
+	"#" : "translating    class=''abc''    into    class='abc'   ",
+	"='\\1": "/=''([^ ])/",
+	"\\1' ": "/([^=])'' /",
+
+	"#" : "translating    ''mondrian.rolap.maxSqlQueryThreads'    into    'mondrian.rolap.maxSqlQueryThreads'   ",
+	" '\\1": "/ ''(\\p{L}{1})/",
+	"'mondrian.": "''mondrian."
+}
